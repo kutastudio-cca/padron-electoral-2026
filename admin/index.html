@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Panel de Administración</title>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js">
+    </script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js">
+    </script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js">
+    </script>
+
+    <!-- SheetJS para leer Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js">
+    </script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f0ec;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #8b0000, #cc0000);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-size: 14px;
+        }
+
+        .header .btn-logout {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 8px 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .header .btn-logout:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .section {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title .badge {
+            background: #f0ebe7;
+            color: #666;
+            font-size: 12px;
+            padding: 2px 12px;
+            border-radius: 20px;
+            font-weight: 500;
+        }
+
+        .upload-area {
+            border: 2px dashed #d32f2f;
+            border-radius: 10px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #fef6f4;
+        }
+
+        .upload-area:hover {
+            background: #fdf0ec;
+            border-color: #a30000;
+        }
+
+        .upload-area input[type="file"] {
+            display: none;
+        }
+
+        .upload-area .icon {
+            font-size: 40px;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .upload-area .text {
+            font-size: 15px;
+            color: #555;
+        }
+
+        .upload-area .text strong {
+            color: #cc0000;
+        }
+
+        .upload-status {
+            margin-top: 15px;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .upload-status.success {
+            display: block;
+            background: #e6f7e6;
+            color: #2e7d32;
+            border: 1px solid #a5d6a7;
+        }
+
+        .upload-status.error {
+            display: block;
+            background: #ffe5e5;
+            color: #cc0000;
+            border: 1px solid #ffcdd2;
+        }
+
+        .upload-status.info {
+            display: block;
+            background: #e3f2fd;
+            color: #0d47a1;
+            border: 1px solid #90caf9;
+        }
+
+        .btn-upload {
+            background: #cc0000;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-top: 12px;
+        }
+
+        .btn-upload:hover {
+            background: #a30000;
+        }
+
+        .btn-upload:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .candidatos-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 15px;
+        }
+
+        .candidato-card {
+            background: #faf7f5;
+            border-radius: 10px;
+            padding: 16px 18px;
+            border: 1px solid #f0e6e0;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            transition: all 0.3s;
+        }
+
+        .candidato-card:hover {
+            border-color: #cc0000;
+            box-shadow: 0 2px 8px rgba(204, 0, 0, 0.08);
+        }
+
+        .candidato-card .avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: 2px solid #e0d6d0;
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+
+        .candidato-card .info {
+            flex: 1;
+        }
+
+        .candidato-card .info .name {
+            font-weight: 600;
+            color: #1a1a1a;
+            font-size: 15px;
+        }
+
+        .candidato-card .info .slug {
+            font-size: 12px;
+            color: #888;
+        }
+
+        .candidato-card .info .color-preview {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 1px solid #ddd;
+            vertical-align: middle;
+            margin-top: 2px;
+        }
+
+        .candidato-card .status {
+            font-size: 12px;
+            padding: 2px 12px;
+            border-radius: 20px;
+            font-weight: 500;
+        }
+
+        .candidato-card .status.active {
+            background: #e6f7e6;
+            color: #2e7d32;
+        }
+
+        .candidato-card .status.inactive {
+            background: #f5f0ec;
+            color: #888;
+        }
+
+        .candidato-card .actions {
+            display: flex;
+            gap: 6px;
+        }
+
+        .candidato-card .actions button {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            transition: background 0.3s;
+        }
+
+        .candidato-card .actions .btn-edit:hover {
+            background: #e3f2fd;
+        }
+
+        .candidato-card .actions .btn-delete:hover {
+            background: #ffe5e5;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 30px 20px;
+            color: #999;
+        }
+
+        .empty-state .icon {
+            font-size: 40px;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .btn-add {
+            background: #cc0000;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-add:hover {
+            background: #a30000;
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            max-width: 500px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal .modal-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal .modal-title .close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .modal .form-group {
+            margin-bottom: 16px;
+        }
+
+        .modal .form-group label {
+            display: block;
+            font-weight: 600;
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .modal .form-group input,
+        .modal .form-group select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 2px solid #e0d6d0;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            transition: border 0.3s;
+        }
+
+        .modal .form-group input:focus {
+            border-color: #cc0000;
+        }
+
+        .modal .form-group .color-input {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .modal .form-group .color-input input[type="color"] {
+            width: 40px;
+            height: 40px;
+            padding: 2px;
+            border: 2px solid #e0d6d0;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .modal .form-group .color-input input[type="text"] {
+            flex: 1;
+        }
+
+        .modal .form-group .image-preview {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 2px solid #e0d6d0;
+            object-fit: cover;
+            margin-top: 8px;
+        }
+
+        .modal .btn-save {
+            width: 100%;
+            padding: 12px;
+            background: #cc0000;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-top: 6px;
+        }
+
+        .modal .btn-save:hover {
+            background: #a30000;
+        }
+
+        .modal .btn-save:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        @media (max-width: 600px) {
+            .header {
+                flex-direction: column;
+                text-align: center;
+                padding: 15px 20px;
+            }
+            .header .user-info {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            .candidatos-grid {
+                grid-template-columns: 1fr;
+            }
+            .modal {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+
+        <header class="header">
+            <h1>🔐 Panel de Administración</h1>
+            <div class="user-info">
+                <span id="userEmail">cargando...</span>
+                <button class="btn-logout" id="logoutBtn">🚪 Cerrar sesión</button>
+            </div>
+        </header>
+
+        <section class="section">
+            <div class="section-title">
+                📊 Datos del Padrón
+                <span class="badge" id="registrosBadge">0 registros</span>
+            </div>
+
+            <div class="upload-area" id="uploadArea">
+                <span class="icon">📂</span>
+                <div class="text">
+                    <strong>Haz clic aquí</strong> o arrastra tu archivo Excel
+                    <br />
+                    <small style="color:#999;">.xlsx o .xls</small>
+                </div>
+                <input type="file" id="fileInput" accept=".xlsx,.xls" />
+            </div>
+
+            <div id="uploadStatus" class="upload-status"></div>
+
+            <button class="btn-upload" id="uploadBtn" disabled>
+                📤 Subir a la nube
+            </button>
+        </section>
+
+        <section class="section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                <div class="section-title" style="margin-bottom: 0;">
+                    🎨 Candidatos
+                </div>
+                <button class="btn-add" id="addCandidatoBtn">➕ Agregar candidato</button>
+            </div>
+
+            <div id="candidatosContainer">
+                <div class="empty-state">
+                    <span class="icon">📭</span>
+                    No hay candidatos registrados.
+                    <br />
+                    <small>Agrega tu primer candidato</small>
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <div class="modal-title">
+                <span id="modalTitle">Agregar candidato</span>
+                <button class="close" id="modalClose">✖</button>
+            </div>
+
+            <form id="candidatoForm">
+                <div class="form-group">
+                    <label for="candNombre">Nombre del candidato</label>
+                    <input type="text" id="candNombre" placeholder="Ej: Pablo Alderete" required />
+                </div>
+
+                <div class="form-group">
+                    <label for="candSlug">Slug (URL amigable)</label>
+                    <input type="text" id="candSlug" placeholder="Ej: pablo-alderete" required />
+                    <small style="color:#888; font-size:12px;">Solo letras minúsculas, números y guiones</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Color principal</label>
+                    <div class="color-input">
+                        <input type="color" id="candColor" value="#cc0000" />
+                        <input type="text" id="candColorText" value="#cc0000" />
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="candImagen">Imagen del candidato</label>
+                    <input type="file" id="candImagen" accept="image/*" />
+                    <br />
+                    <img id="candImagenPreview" class="image-preview" style="display:none;" />
+                </div>
+
+                <div class="form-group">
+                    <label>Estado</label>
+                    <select id="candEstado">
+                        <option value="activo">🟢 Activo</option>
+                        <option value="inactivo">🔴 Inactivo</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn-save" id="saveCandidatoBtn">💾 Guardar</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        //  1. CONFIGURACIÓN DE FIREBASE
+        // ============================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyAk2DoRWPRUuCl01bDX-iHWa6a56nOBzxU",
+            authDomain: "padron-electoral-2026-32bc8.firebaseapp.com",
+            projectId: "padron-electoral-2026-32bc8",
+            storageBucket: "padron-electoral-2026-32bc8.firebasestorage.app",
+            messagingSenderId: "143219673179",
+            appId: "1:143219673179:web:9e318c173ed4558a99d77e"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // ============================================================
+        //  2. DOM
+        // ============================================================
+        const userEmail = document.getElementById('userEmail');
+        const logoutBtn = document.getElementById('logoutBtn');
+
+        const fileInput = document.getElementById('fileInput');
+        const uploadArea = document.getElementById('uploadArea');
+        const uploadStatus = document.getElementById('uploadStatus');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const registrosBadge = document.getElementById('registrosBadge');
+
+        const candidatosContainer = document.getElementById('candidatosContainer');
+        const addCandidatoBtn = document.getElementById('addCandidatoBtn');
+
+        const modalOverlay = document.getElementById('modalOverlay');
+        const modalClose = document.getElementById('modalClose');
+        const modalTitle = document.getElementById('modalTitle');
+        const candidatoForm = document.getElementById('candidatoForm');
+        const saveCandidatoBtn = document.getElementById('saveCandidatoBtn');
+
+        const candNombre = document.getElementById('candNombre');
+        const candSlug = document.getElementById('candSlug');
+        const candColor = document.getElementById('candColor');
+        const candColorText = document.getElementById('candColorText');
+        const candImagen = document.getElementById('candImagen');
+        const candImagenPreview = document.getElementById('candImagenPreview');
+        const candEstado = document.getElementById('candEstado');
+
+        let excelData = [];
+        let editandoCandidato = null;
+
+        // ============================================================
+        //  3. AUTENTICACIÓN
+        // ============================================================
+        auth.onAuthStateChanged(function(user) {
+            if (!user) {
+                window.location.href = 'login.html';
+                return;
+            }
+            userEmail.textContent = user.email;
+            cargarDatos();
+        });
+
+        logoutBtn.addEventListener('click', function() {
+            auth.signOut();
+        });
+
+        // ============================================================
+        //  4. CARGA DE EXCEL
+        // ============================================================
+        uploadArea.addEventListener('click', function() {
+            fileInput.click();
+        });
+
+        uploadArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            this.style.borderColor = '#a30000';
+            this.style.background = '#fdf0ec';
+        });
+
+        uploadArea.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            this.style.borderColor = '#d32f2f';
+            this.style.background = '#fef6f4';
+        });
+
+        uploadArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.style.borderColor = '#d32f2f';
+            this.style.background = '#fef6f4';
+
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                procesarArchivo(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', function() {
+            if (this.files.length > 0) {
+                procesarArchivo(this.files[0]);
+            }
+        });
+
+        function procesarArchivo(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const json = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+
+                    if (!json || json.length === 0) {
+                        mostrarStatus('El archivo está vacío.', 'error');
+                        return;
+                    }
+
+                    excelData = json;
+                    mostrarStatus(`✅ ${json.length} registros cargados. Listo para subir.`, 'success');
+                    uploadBtn.disabled = false;
+                    registrosBadge.textContent = `${json.length} registros`;
+
+                } catch (error) {
+                    console.error('Error al leer archivo:', error);
+                    mostrarStatus('Error al leer el archivo: ' + error.message, 'error');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function mostrarStatus(mensaje, tipo) {
+            uploadStatus.textContent = mensaje;
+            uploadStatus.className = 'upload-status ' + tipo;
+        }
+
+        // ============================================================
+        //  5. SUBIR DATOS A FIRESTORE
+        // ============================================================
+        uploadBtn.addEventListener('click', async function() {
+            if (excelData.length === 0) {
+                mostrarStatus('No hay datos para subir.', 'error');
+                return;
+            }
+
+            this.disabled = true;
+            mostrarStatus('⏳ Subiendo datos...', 'info');
+
+            try {
+                const batch = db.batch();
+                const collectionRef = db.collection('padron_unificado');
+
+                const sampleRow = excelData[0];
+                const cedulaKey = Object.keys(sampleRow).find(k =>
+                    k.toLowerCase().trim() === 'cedula' ||
+                    k.toLowerCase().trim() === 'cédula'
+                );
+
+                if (!cedulaKey) {
+                    mostrarStatus('No se encontró la columna "cedula".', 'error');
+                    this.disabled = false;
+                    return;
+                }
+
+                excelData.forEach((row) => {
+                    const cedula = String(row[cedulaKey]).trim();
+                    if (cedula) {
+                        const docRef = collectionRef.doc(cedula);
+                        batch.set(docRef, row);
+                    }
+                });
+
+                await batch.commit();
+                mostrarStatus(`✅ ${excelData.length} registros subidos exitosamente.`, 'success');
+                registrosBadge.textContent = `${excelData.length} registros`;
+
+            } catch (error) {
+                console.error('Error al subir datos:', error);
+                mostrarStatus('❌ Error al subir datos: ' + error.message, 'error');
+            }
+
+            this.disabled = false;
+        });
+
+        // ============================================================
+        //  6. GESTIÓN DE CANDIDATOS
+        // ============================================================
+        async function cargarCandidatos() {
+            try {
+                const snapshot = await db.collection('candidatos').get();
+                const candidatos = [];
+                snapshot.forEach(doc => {
+                    candidatos.push({ id: doc.id, ...doc.data() });
+                });
+                renderizarCandidatos(candidatos);
+            } catch (error) {
+                console.error('Error al cargar candidatos:', error);
+                candidatosContainer.innerHTML = `
+                            <div class="empty-state">
+                                <span class="icon">❌</span>
+                                Error al cargar candidatos.
+                            </div>
+                        `;
+            }
+        }
+
+        function renderizarCandidatos(candidatos) {
+            if (candidatos.length === 0) {
+                candidatosContainer.innerHTML = `
+                            <div class="empty-state">
+                                <span class="icon">📭</span>
+                                No hay candidatos registrados.
+                                <br />
+                                <small>Agrega tu primer candidato</small>
+                            </div>
+                        `;
+                return;
+            }
+
+            let html = '<div class="candidatos-grid">';
+            candidatos.forEach(c => {
+                const statusClass = c.activo !== false ? 'active' : 'inactive';
+                const statusText = c.activo !== false ? '🟢 Activo' : '🔴 Inactivo';
+                const color = c.color_principal || '#cc0000';
+
+                html += `
+                            <div class="candidato-card">
+                                <img class="avatar" src="${c.imagen_url || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(c.nombre) + '&background=cc0000&color=fff'}" alt="${c.nombre}" />
+                                <div class="info">
+                                    <div class="name">${c.nombre}</div>
+                                    <div class="slug">
+                                        ${c.slug}
+                                        <span class="color-preview" style="background:${color};"></span>
+                                    </div>
+                                    <span class="status ${statusClass}">${statusText}</span>
+                                </div>
+                                <div class="actions">
+                                    <button class="btn-edit" onclick="editarCandidato('${c.id}')" title="Editar">✏️</button>
+                                    <button class="btn-delete" onclick="eliminarCandidato('${c.id}')" title="Eliminar">🗑️</button>
+                                </div>
+                            </div>
+                        `;
+            });
+            html += '</div>';
+            candidatosContainer.innerHTML = html;
+        }
+
+        // ============================================================
+        //  7. AGREGAR / EDITAR CANDIDATO
+        // ============================================================
+        addCandidatoBtn.addEventListener('click', function() {
+            editandoCandidato = null;
+            modalTitle.textContent = '➕ Agregar candidato';
+            candidatoForm.reset();
+            candColor.value = '#cc0000';
+            candColorText.value = '#cc0000';
+            candImagenPreview.style.display = 'none';
+            candImagenPreview.src = '';
+            saveCandidatoBtn.textContent = '💾 Guardar';
+            modalOverlay.classList.add('active');
+        });
+
+        modalClose.addEventListener('click', function() {
+            modalOverlay.classList.remove('active');
+        });
+
+        modalOverlay.addEventListener('click', function(e) {
+            if (e.target === modalOverlay) {
+                modalOverlay.classList.remove('active');
+            }
+        });
+
+        candColor.addEventListener('input', function() {
+            candColorText.value = this.value;
+        });
+
+        candColorText.addEventListener('input', function() {
+            candColor.value = this.value;
+        });
+
+        candImagen.addEventListener('change', function() {
+            const file = this.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    candImagenPreview.src = e.target.result;
+                    candImagenPreview.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        candidatoForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const nombre = candNombre.value.trim();
+            const slug = candSlug.value.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+            const color = candColor.value;
+            const estado = candEstado.value === 'activo';
+
+            if (!nombre || !slug) {
+                alert('Completa todos los campos.');
+                return;
+            }
+
+            saveCandidatoBtn.disabled = true;
+            saveCandidatoBtn.textContent = '⏳ Guardando...';
+
+            try {
+                const data = {
+                    nombre: nombre,
+                    slug: slug,
+                    color_principal: color,
+                    color_secundario: color,
+                    activo: estado,
+                    imagen_url: `https://ui-avatars.com/api/?name=${encodeURIComponent(nombre)}&background=${color.replace('#', '')}&color=fff`,
+                    fecha_creacion: new Date().toISOString()
+                };
+
+                if (editandoCandidato) {
+                    await db.collection('candidatos').doc(editandoCandidato).update(data);
+                } else {
+                    await db.collection('candidatos').doc(slug).set(data);
+                }
+
+                modalOverlay.classList.remove('active');
+                cargarCandidatos();
+
+            } catch (error) {
+                console.error('Error al guardar candidato:', error);
+                alert('Error al guardar: ' + error.message);
+            }
+
+            saveCandidatoBtn.disabled = false;
+            saveCandidatoBtn.textContent = '💾 Guardar';
+        });
+
+        // ============================================================
+        //  8. EDITAR / ELIMINAR CANDIDATO
+        // ============================================================
+        window.editarCandidato = async function(id) {
+            try {
+                const doc = await db.collection('candidatos').doc(id).get();
+                if (!doc.exists) return;
+
+                const data = doc.data();
+                editandoCandidato = id;
+                modalTitle.textContent = '✏️ Editar candidato';
+                candNombre.value = data.nombre || '';
+                candSlug.value = data.slug || '';
+                candColor.value = data.color_principal || '#cc0000';
+                candColorText.value = data.color_principal || '#cc0000';
+                candEstado.value = data.activo !== false ? 'activo' : 'inactivo';
+                saveCandidatoBtn.textContent = '💾 Actualizar';
+
+                if (data.imagen_url) {
+                    candImagenPreview.src = data.imagen_url;
+                    candImagenPreview.style.display = 'block';
+                }
+
+                modalOverlay.classList.add('active');
+
+            } catch (error) {
+                console.error('Error al editar candidato:', error);
+                alert('Error al cargar datos: ' + error.message);
+            }
+        };
+
+        window.eliminarCandidato = async function(id) {
+            if (!confirm('¿Eliminar este candidato permanentemente?')) return;
+
+            try {
+                await db.collection('candidatos').doc(id).delete();
+                cargarCandidatos();
+            } catch (error) {
+                console.error('Error al eliminar:', error);
+                alert('Error al eliminar: ' + error.message);
+            }
+        };
+
+        // ============================================================
+        //  9. INICIALIZAR
+        // ============================================================
+        function cargarDatos() {
+            cargarCandidatos();
+            db.collection('padron_unificado').get().then(snapshot => {
+                registrosBadge.textContent = `${snapshot.size} registros`;
+            }).catch(() => {
+                registrosBadge.textContent = '0 registros';
+            });
+        }
+
+        console.log('✅ Panel de administración cargado');
+    </script>
+
+</body>
+</html>
